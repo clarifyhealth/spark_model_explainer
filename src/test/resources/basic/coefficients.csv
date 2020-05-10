@@ -1,0 +1,16 @@
+Feature_Index,Feature,Original_Feature,Coefficient
+1,sex_male,sex_male,1.410004327
+2,sex_female,sex_female,-1.410004327
+3,age_0,age_0,-6.99441E-14
+4,age_1,age_1,-7.666724954
+5,age_2,age_2,-5.102090208
+6,age_3,age_3,-1.324084362
+7,age_4,age_4,4.507557263
+8,age_5,age_5,14.16522661
+9,age_6,age_6,17.6124804
+10,age_7,age_7,0.516246475
+11,age_8,age_8,0.534556639
+12,age_9,age_9,1.055556375
+13,age_10,age_10,14.21919207
+14,age_11,age_11,1.437375425
+-1,Intercept,Intercept,1.96
