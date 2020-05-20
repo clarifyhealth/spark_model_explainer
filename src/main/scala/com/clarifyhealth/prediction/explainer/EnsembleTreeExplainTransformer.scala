@@ -20,7 +20,7 @@ import scala.collection.SortedMap
 import scala.collection.immutable.Nil
 
 class EnsembleTreeExplainTransformer(override val uid: String)
-    extends Transformer
+  extends Transformer
     with DefaultParamsWritable {
 
   def this() = this(Identifiable.randomUID("EnsembleTreeExplainTransformer"))
@@ -116,8 +116,8 @@ class EnsembleTreeExplainTransformer(override val uid: String)
   final def getIsClassification: Boolean = $(isClassification)
 
   final def setIsClassification(
-      value: Boolean
-  ): EnsembleTreeExplainTransformer =
+                                 value: Boolean
+                               ): EnsembleTreeExplainTransformer =
     set(isClassification, value)
 
   /**
@@ -135,20 +135,6 @@ class EnsembleTreeExplainTransformer(override val uid: String)
   final def setEnsembleType(value: String): EnsembleTreeExplainTransformer =
     set(ensembleType, value)
 
-  /**
-    * Param for control to control boosted classification
-    */
-  final val boosted: Param[Boolean] =
-    new Param[Boolean](
-      this,
-      "boosted",
-      "is boosted classification"
-    )
-
-  final def getBoosted: Boolean = $(boosted)
-
-  final def setBoosted(value: Boolean): EnsembleTreeExplainTransformer =
-    set(boosted, value)
 
   // (Optional) You can set defaults for Param values if you like.
   setDefault(
@@ -158,12 +144,12 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     modelPath -> "modelPath",
     dropPathColumn -> true,
     isClassification -> false,
-    ensembleType -> "rf",
-    boosted -> false
+    ensembleType -> "rf"
   )
 
   /**
     * To set  map(key,struct) schema for paths column
+    *
     * @param df
     * @param columnName
     * @return
@@ -187,28 +173,30 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
   /**
     * The encoder applies the schema to paths column
+    *
     * @param df
     * @param columnName column name / label as prefix
     * @return
     */
   private def buildPathsEncoder(
-      df: DataFrame,
-      columnName: String
-  ): ExpressionEncoder[Row] = {
+                                 df: DataFrame,
+                                 columnName: String
+                               ): ExpressionEncoder[Row] = {
     val newSchema = getPathsSchema(df, columnName)
     RowEncoder.apply(newSchema)
   }
 
   /**
     * To set nested array(val) schema
+    *
     * @param df
     * @param columnName column name / label as prefix
     * @return
     */
   private def getContribSchema(
-      df: DataFrame,
-      columnName: String
-  ): StructType = {
+                                df: DataFrame,
+                                columnName: String
+                              ): StructType = {
     var schema: StructType = df.schema
     schema = schema.add(
       columnName,
@@ -222,17 +210,19 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
   /**
     * The encoder applies the schema based on nested vs flattened
+    *
     * @param df
     * @param columnName act as prefix when flattened mode else column name when nested mode
     * @return
     */
   private def buildContribEncoder(
-      df: DataFrame,
-      columnName: String
-  ): ExpressionEncoder[Row] = {
+                                   df: DataFrame,
+                                   columnName: String
+                                 ): ExpressionEncoder[Row] = {
     val newSchema = getContribSchema(df, columnName)
     RowEncoder.apply(newSchema)
   }
+
   // Transformer requires 3 methods:
   //  - transform
   //  - transformSchema
@@ -279,17 +269,12 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     val contributionsDF = calculateContributions(
       predictionsWithPathsDf,
       featureIndexCoefficient,
-      getBoosted,
       model
     )
-    val contrib_simple = model.predict(
+
+    val contrib_intercept = model.predict(
       Vectors.sparse(featureIndexCoefficient.size, Array(), Array())
     )
-    val contrib_intercept =
-      if (getBoosted)
-        1 / (1 + exp(-contrib_simple))
-      else
-        contrib_simple
 
     val finalDF =
       contributionsDF.withColumn(
@@ -308,6 +293,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
   /**
     * The method to prefix column with label
+    *
     * @param label
     * @param df
     * @return
@@ -323,14 +309,15 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
   /**
     * This is the main entry point to calculate linear contribution of each feature
+    *
     * @param df
     * @param featureIndexCoefficient
     * @return
     */
   private def pathGenerator(
-      df: DataFrame,
-      featureIndexCoefficient: SortedMap[Long, (String, Double)]
-  ): DataFrame = {
+                             df: DataFrame,
+                             featureIndexCoefficient: SortedMap[Long, (String, Double)]
+                           ): DataFrame = {
     val encoder =
       buildPathsEncoder(df, "paths")
     val func =
@@ -346,7 +333,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     ----------------------------------------------------------------------
    */
   private val pathGeneratorRow
-      : (StructType) => (SortedMap[Long, (String, Double)]) => Row => Row =
+  : (StructType) => (SortedMap[Long, (String, Double)]) => Row => Row =
     (schema) =>
       (featureIndexCoefficient) =>
         (row) => {
@@ -402,54 +389,48 @@ class EnsembleTreeExplainTransformer(override val uid: String)
         }
 
   private def calculateContributions(
-      df: DataFrame,
-      featureIndexCoefficient: SortedMap[Long, (String, Double)],
-      boosted: Boolean,
-      model: Model[_]
-  ): DataFrame = {
+                                      df: DataFrame,
+                                      featureIndexCoefficient: SortedMap[Long, (String, Double)],
+                                      model: Model[_]
+                                    ): DataFrame = {
     val encoder =
       buildContribEncoder(df, "contrib")
     val func =
-      contributionsRows(df.schema)(featureIndexCoefficient, boosted, model)
+      contributionsRows(df.schema)(featureIndexCoefficient, model)
     df.mapPartitions(x => x.map(func))(encoder)
   }
+
   /*
      Map over Rows and feature to calculate contributions
      ----------------------------------------------------------------------
    */
   private val contributionsRows: StructType => (
-      SortedMap[Long, (String, Double)],
-      Boolean,
+    SortedMap[Long, (String, Double)],
       Model[_]
-  ) => Row => Row =
+    ) => Row => Row =
     (schema) =>
-      (featureIndexCoefficient, boosted, model) =>
+      (featureIndexCoefficient, model) =>
         (row) => {
           val innerModel =
             model match {
               case model1: RandomForestClassificationModel => model1
-              case model2: RandomForestRegressionModel     => model2
+              case model2: RandomForestRegressionModel => model2
             }
           val path = row.getMap[Long, Row](schema.fieldIndex("paths"))
           val contributions: Seq[Double] = featureIndexCoefficient.map {
             case (outerFeatureNum, _) =>
               path.get(outerFeatureNum) match {
                 case Some(
-                    Row(
-                      _,
-                      inclusionVector: Vector,
-                      exclusionVector: Vector
-                    )
-                    ) =>
+                Row(
+                _,
+                inclusionVector: Vector,
+                exclusionVector: Vector
+                )
+                ) =>
                   val contrib =
-                    if (boosted)
-                      (1 / (1 + exp(-innerModel.predict(inclusionVector)))) - (1 / (1 + exp(
-                        -innerModel.predict(exclusionVector)
-                      )))
-                    else
-                      innerModel.predict(inclusionVector) - innerModel.predict(
-                        exclusionVector
-                      )
+                    innerModel.predict(inclusionVector) - innerModel.predict(
+                      exclusionVector
+                    )
                   contrib
               }
           }.toSeq
@@ -484,17 +465,18 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     * Requirements:
     *  - The copy must have the same UID.
     *  - The copy must have the same Params, with some possibly overwritten by the `extra`
-    *    argument.
+    * argument.
     *  - This should do a deep copy of any data members which are mutable.  That said,
-    *    Transformers should generally be immutable (except for Params), so the `defaultCopy`
-    *    method often suffices.
-    * @param extra  Param values which will overwrite Params in the copy.
+    * Transformers should generally be immutable (except for Params), so the `defaultCopy`
+    * method often suffices.
+    *
+    * @param extra Param values which will overwrite Params in the copy.
     */
   override def copy(extra: ParamMap): Transformer = defaultCopy(extra)
 }
 
 object EnsembleTreeExplainTransformer
-    extends DefaultParamsReadable[EnsembleTreeExplainTransformer] {
+  extends DefaultParamsReadable[EnsembleTreeExplainTransformer] {
   override def load(path: String): EnsembleTreeExplainTransformer =
     super.load(path)
 }
