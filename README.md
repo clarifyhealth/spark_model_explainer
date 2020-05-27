@@ -50,8 +50,6 @@ Below are the steps to use this library.
 
 license
 -------
-
-See [LICENSE].
-
+Apache License Version 2.0 
 
 
