@@ -38,7 +38,7 @@ Below are the steps to use this library.
 ```scala
     import com.clarifyhealth.prediction.explainer.EnsembleTreeExplainTransformer
     val explainTransformer = new EnsembleTreeExplainTransformer()
-    explainTransformer.setCoefficientView("my_coefficients")
+    explainTransformer.setFeatureImportanceView("my_feature_importance")
     explainTransformer.setPredictionView("my_predictions")
     explainTransformer.setLabel("label")
     explainTransformer.setModelPath(rf_model_path)

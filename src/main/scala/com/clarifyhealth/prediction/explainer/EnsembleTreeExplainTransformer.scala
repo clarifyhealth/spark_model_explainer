@@ -5,17 +5,13 @@ import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param.{Param, ParamMap}
 import org.apache.spark.ml.regression.RandomForestRegressionModel
-import org.apache.spark.ml.util.{
-  DefaultParamsReadable,
-  DefaultParamsWritable,
-  Identifiable
-}
+import org.apache.spark.ml.util.{DefaultParamsReadable, DefaultParamsWritable, Identifiable}
 import org.apache.spark.ml.{Model, Transformer}
 import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
-import scala.math.exp
+
 import scala.collection.SortedMap
 import scala.collection.immutable.Nil
 
@@ -48,15 +44,15 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     set(predictionView, value)
 
   /**
-    * Param for coefficientView name.
+    * Param for featureImportance name.
     */
-  final val coefficientView: Param[String] =
-    new Param[String](this, "coefficientView", "input coefficient view name")
+  final val featureImportanceView: Param[String] =
+    new Param[String](this, "featureImportanceView", "input featureImportance view name")
 
-  final def getCoefficientView: String = $(coefficientView)
+  final def getFeatureImportanceView: String = $(featureImportanceView)
 
-  final def setCoefficientView(value: String): EnsembleTreeExplainTransformer =
-    set(coefficientView, value)
+  final def setFeatureImportanceView(value: String): EnsembleTreeExplainTransformer =
+    set(featureImportanceView, value)
 
   /**
     * Param for label name.
@@ -139,7 +135,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
   // (Optional) You can set defaults for Param values if you like.
   setDefault(
     predictionView -> "predictions",
-    coefficientView -> "coefficient",
+    featureImportanceView -> "featureImportance",
     label -> "test",
     modelPath -> "modelPath",
     dropPathColumn -> true,
@@ -241,12 +237,12 @@ class EnsembleTreeExplainTransformer(override val uid: String)
   override def transform(dataset: Dataset[_]): DataFrame = {
 
     val featureImportanceDF = dataset.sqlContext
-      .table($(coefficientView))
-      .select("Feature_Index", "Feature", "Coefficient")
+      .table($(featureImportanceView))
+      .select("Feature_Index", "Feature", "Importance")
       .orderBy("Feature_Index")
       .collect()
 
-    val featureIndexCoefficient = SortedMap(
+    val featureIndexImportance = SortedMap(
       featureImportanceDF
         .map(
           row =>
@@ -259,7 +255,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     val predictionsWithPathsDf =
       pathGenerator(
         predictionsDf,
-        featureIndexCoefficient
+        featureIndexImportance
       )
     val model =
       if (getIsClassification)
@@ -268,12 +264,12 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
     val contributionsDF = calculateContributions(
       predictionsWithPathsDf,
-      featureIndexCoefficient,
+      featureIndexImportance,
       model
     )
 
     val contrib_intercept = model.predict(
-      Vectors.sparse(featureIndexCoefficient.size, Array(), Array())
+      Vectors.sparse(featureIndexImportance.size, Array(), Array())
     )
 
     val finalDF =
@@ -311,18 +307,18 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     * This is the main entry point to calculate linear contribution of each feature
     *
     * @param df
-    * @param featureIndexCoefficient
+    * @param featureIndexImportance
     * @return
     */
   private def pathGenerator(
                              df: DataFrame,
-                             featureIndexCoefficient: SortedMap[Long, (String, Double)]
+                             featureIndexImportance: SortedMap[Long, (String, Double)]
                            ): DataFrame = {
     val encoder =
       buildPathsEncoder(df, "paths")
     val func =
       pathGeneratorRow(df.schema)(
-        featureIndexCoefficient
+        featureIndexImportance
       )
 
     df.mapPartitions(x => x.map(func))(encoder)
@@ -335,10 +331,10 @@ class EnsembleTreeExplainTransformer(override val uid: String)
   private val pathGeneratorRow
   : (StructType) => (SortedMap[Long, (String, Double)]) => Row => Row =
     (schema) =>
-      (featureIndexCoefficient) =>
+      (featureIndexImportance) =>
         (row) => {
-          val calculatedPaths = featureIndexCoefficient.map {
-            case (outerFeatureNum, (outerFeatureName, outerCoefficient)) =>
+          val calculatedPaths = featureIndexImportance.map {
+            case (outerFeatureNum, (outerFeatureName, outerImportance)) =>
               // 4
               val outerFeatureVal =
                 row
@@ -350,31 +346,31 @@ class EnsembleTreeExplainTransformer(override val uid: String)
                 outerFeatureNum -> Row(
                   0L,
                   Vectors
-                    .sparse(featureIndexCoefficient.size, Array(), Array()),
+                    .sparse(featureIndexImportance.size, Array(), Array()),
                   Vectors
-                    .sparse(featureIndexCoefficient.size, Array(), Array())
+                    .sparse(featureIndexImportance.size, Array(), Array())
                 )
               } else {
                 // handle exclusion
-                val exclusionPath = featureIndexCoefficient.map {
-                  case (_, (innerFeatureName, innerCoefficient)) =>
+                val exclusionPath = featureIndexImportance.map {
+                  case (_, (innerFeatureName, innerImportance)) =>
                     val innerFeatureVal =
                       row
                         .get(schema.fieldIndex(innerFeatureName))
                         .toString
                         .toDouble
-                    if (innerCoefficient <= outerCoefficient) 0.0
+                    if (innerImportance <= outerImportance) 0.0
                     else innerFeatureVal
                 }.toArray
                 // handle inclusion
-                val inclusionPath = featureIndexCoefficient.map {
-                  case (_, (innerFeatureName, innerCoefficient)) =>
+                val inclusionPath = featureIndexImportance.map {
+                  case (_, (innerFeatureName, innerImportance)) =>
                     val innerFeatureVal =
                       row
                         .get(schema.fieldIndex(innerFeatureName))
                         .toString
                         .toDouble
-                    if (innerCoefficient < outerCoefficient) 0.0
+                    if (innerImportance < outerImportance) 0.0
                     else innerFeatureVal
                 }.toArray
 
@@ -390,13 +386,13 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
   private def calculateContributions(
                                       df: DataFrame,
-                                      featureIndexCoefficient: SortedMap[Long, (String, Double)],
+                                      featureIndexImportance: SortedMap[Long, (String, Double)],
                                       model: Model[_]
                                     ): DataFrame = {
     val encoder =
       buildContribEncoder(df, "contrib")
     val func =
-      contributionsRows(df.schema)(featureIndexCoefficient, model)
+      contributionsRows(df.schema)(featureIndexImportance, model)
     df.mapPartitions(x => x.map(func))(encoder)
   }
 
@@ -409,7 +405,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
       Model[_]
     ) => Row => Row =
     (schema) =>
-      (featureIndexCoefficient, model) =>
+      (featureIndexImportance, model) =>
         (row) => {
           val innerModel =
             model match {
@@ -417,7 +413,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
               case model2: RandomForestRegressionModel => model2
             }
           val path = row.getMap[Long, Row](schema.fieldIndex("paths"))
-          val contributions: Seq[Double] = featureIndexCoefficient.map {
+          val contributions: Seq[Double] = featureIndexImportance.map {
             case (outerFeatureNum, _) =>
               path.get(outerFeatureNum) match {
                 case Some(

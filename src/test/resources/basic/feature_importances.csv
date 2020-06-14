@@ -1,4 +1,4 @@
-Feature_Index,Feature,Original_Feature,Coefficient
+Feature_Index,Feature,Original_Feature,Importance
 0,sex_male,sex_male,0.020717224553523397
 1,sex_female,sex_female,0.020828525924876107
 2,age_0,age_0,0.013136139585218374

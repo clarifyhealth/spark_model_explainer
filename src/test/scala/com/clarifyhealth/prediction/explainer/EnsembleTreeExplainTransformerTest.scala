@@ -6,8 +6,9 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, QueryTest, SaveMode}
 
 import scala.collection.immutable.Nil
+
 class EnsembleTreeExplainTransformerTest
-    extends QueryTest
+  extends QueryTest
     with SharedSparkSession {
   def initialize(): (DataFrame, DataFrame) = {
     val predictionDF = spark.read
@@ -21,7 +22,7 @@ class EnsembleTreeExplainTransformerTest
       StructField("Feature_Index", LongType) ::
         StructField("Feature", StringType) ::
         StructField("Original_Feature", StringType) ::
-        StructField("Coefficient", DoubleType) :: Nil
+        StructField("Importance", DoubleType) :: Nil
     )
 
     val coefficientsDF = spark.read
@@ -32,7 +33,7 @@ class EnsembleTreeExplainTransformerTest
     coefficientsDF.show()
     coefficientsDF.printSchema()
 
-    coefficientsDF.createOrReplaceTempView("my_coefficients")
+    coefficientsDF.createOrReplaceTempView("my_feature_importance")
 
     (predictionDF, coefficientsDF)
   }
@@ -46,7 +47,7 @@ class EnsembleTreeExplainTransformerTest
     val rf_model_path = getClass.getResource("/test_rf_model").getPath
 
     val explainTransformer = new EnsembleTreeExplainTransformer()
-    explainTransformer.setCoefficientView("my_coefficients")
+    explainTransformer.setFeatureImportanceView("my_feature_importance")
     explainTransformer.setPredictionView("my_predictions")
     explainTransformer.setLabel("label")
     explainTransformer.setModelPath(rf_model_path)
