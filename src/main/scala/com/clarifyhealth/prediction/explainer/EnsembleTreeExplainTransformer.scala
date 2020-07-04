@@ -1,5 +1,6 @@
 package com.clarifyhealth.prediction.explainer
 
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml.classification.RandomForestClassificationModel
 import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
@@ -257,10 +258,19 @@ class EnsembleTreeExplainTransformer(override val uid: String)
         predictionsDf,
         featureIndexImportance
       )
+
     val model =
-      if (getIsClassification)
-        RandomForestClassificationModel.load(getModelPath)
-      else RandomForestRegressionModel.load(getModelPath)
+      if (getIsClassification) {
+        getEnsembleType.toLowerCase() match {
+          case "rf" => RandomForestClassificationModel.load(getModelPath)
+          case "xgboost4j" => XGBoostClassificationModel.load(getModelPath)
+        }
+      } else {
+        getEnsembleType toLowerCase() match {
+          case "rf" => RandomForestRegressionModel.load(getModelPath)
+          case "xgboost4j" => XGBoostRegressionModel.load(getModelPath)
+        }
+      }
 
     val contributionsDF = calculateContributions(
       predictionsWithPathsDf,
@@ -286,6 +296,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
     finalColRenamedDF
   }
+
 
   /**
     * The method to prefix column with label
@@ -407,11 +418,13 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     (schema) =>
       (featureIndexImportance, model) =>
         (row) => {
-          val innerModel =
-            model match {
-              case model1: RandomForestClassificationModel => model1
-              case model2: RandomForestRegressionModel => model2
-            }
+          val innerModel = model match {
+            case model1: RandomForestClassificationModel => model1
+            case model2: RandomForestRegressionModel => model2
+            case model3: XGBoostRegressionModel => model3
+            case model4: XGBoostClassificationModel => model4
+            case _ => throw new UnsupportedOperationException("ONLY RandomForest and XGBoost supported")
+          }
           val path = row.getMap[Long, Row](schema.fieldIndex("paths"))
           val contributions: Seq[Double] = featureIndexImportance.map {
             case (outerFeatureNum, _) =>
@@ -441,6 +454,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
             )
           )
         }
+
 
   /**
     * Check transform validity and derive the output schema from the input schema.

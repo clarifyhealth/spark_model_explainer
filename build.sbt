@@ -6,6 +6,7 @@ version := "0.1"
 scalaVersion := "2.11.12"
 
 val sparkVersion = "2.4.4"
+val xgboost4jVersion = "1.1.1"
 
 scalacOptions := Seq("-unchecked", "-deprecation")
 
@@ -13,6 +14,8 @@ scalacOptions := Seq("-unchecked", "-deprecation")
 parallelExecution in Test := false
 // remove version-specific scala dirs
 crossPaths := false
+
+resolvers += "XGBoost4J Release Repo" at "https://s3-us-west-2.amazonaws.com/xgboost-maven-repo/release/"
 
 developers := List(
   Developer("iman", "Iman Haji", "@iman", url("https://github.com/")),
@@ -29,7 +32,10 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion % "test" classifier "tests",
   "org.apache.spark" %% "spark-catalyst" % sparkVersion % "test" classifier "tests",
   "org.apache.spark" %% "spark-mllib" % sparkVersion % "test" classifier "tests",
+  "ml.dmlc" %% "xgboost4j" % xgboost4jVersion,
+  "ml.dmlc" %% "xgboost4j-spark" % xgboost4jVersion,
   "org.scalatest" %% "scalatest" % "3.0.8" % Test,
-  "org.scalactic" %% "scalactic" % "3.0.8" % Test
+  "org.scalactic" %% "scalactic" % "3.0.8" % Test,
+
 )
 
