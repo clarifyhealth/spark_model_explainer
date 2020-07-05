@@ -36,7 +36,7 @@ class OneHotDecoder(override val uid: String)
     set(oheSuffix, value)
 
   /**
-    * Param for oheSuffix.
+    * Param for idxSuffix.
     */
   final val idxSuffix: Param[String] =
     new Param[String](
@@ -51,7 +51,7 @@ class OneHotDecoder(override val uid: String)
     set(idxSuffix, value)
 
   /**
-    * Param for oheSuffix.
+    * Param for unknownSuffix.
     */
   final val unknownSuffix: Param[String] =
     new Param[String](
