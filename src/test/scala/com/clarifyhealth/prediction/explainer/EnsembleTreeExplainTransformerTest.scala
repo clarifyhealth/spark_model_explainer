@@ -42,7 +42,7 @@ class EnsembleTreeExplainTransformerTest
 
     spark.sharedState.cacheManager.clearCache()
 
-    val (predictionDF, coefficientsDF) = initialize()
+    val (predictionDF, _) = initialize()
 
     val rf_model_path = getClass.getResource("/test_rf_model").getPath
 
