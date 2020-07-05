@@ -5,12 +5,11 @@ import com.clarifyhealth.prediction.explainer.EnsembleTreeExplainTransformer
 import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassifier, XGBoostRegressor}
 import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.ml.feature.{OneHotEncoderEstimator, SQLTransformer, StringIndexer, VectorAssembler}
-import org.apache.spark.ml.util.DefaultParamsWritable
 
 object StageBuilder {
 
   def getPipelineStages(categorical_columns: Array[String], continuous_columns: Array[String], label_column: String,
-                        classification: Boolean = false): Array[PipelineStage with DefaultParamsWritable] = {
+                        classification: Boolean = false): Array[_ <: PipelineStage] = {
 
     val indexer = categorical_columns.map(c => new StringIndexer().setInputCol(c).setOutputCol(s"${c}_IDX"))
 
@@ -40,7 +39,7 @@ object StageBuilder {
   }
 
   def getExplainStages(predictions_view: String, features_importance_view: String, label_column: String,
-                       rf_model_path: String, classification: Boolean = false): Array[Transformer with DefaultParamsWritable] = {
+                       rf_model_path: String, classification: Boolean = false): Array[_ <: Transformer] = {
 
     val stages = Array(
       new OneHotDecoder().setOheSuffix("_OHE").setIdxSuffix("_IDX").setUnknownSuffix("UUnknownn"),
