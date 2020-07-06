@@ -10,7 +10,7 @@ import java.util.UUID
 
 class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
-  test("xgboost4j regression explain") {
+  ignore("xgboost4j regression explain") {
     spark.sharedState.cacheManager.clearCache()
 
     lazy val labelColumn = "fare_amount"
