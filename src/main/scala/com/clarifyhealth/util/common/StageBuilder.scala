@@ -59,8 +59,8 @@ object StageBuilder {
   }
 
   def getFeatureImportance(spark_session: SparkSession, model: PredictionModel[Vector, _], prediction_df: DataFrame,
-                           feature_column: String): DataFrame = {
-    val featureIndexMapping: Array[Metadata] = getFeatureIndexMapping(prediction_df, feature_column)
+                           features_column: String): DataFrame = {
+    val featureIndexMapping: Array[Metadata] = getFeatureIndexMapping(prediction_df, features_column)
     val featureImportances = getFeatureImportances(model, featureIndexMapping.map(x => x.getString("name")))
     val data = featureIndexMapping.map { item =>
       val idx = item.getLong("idx")
@@ -75,7 +75,11 @@ object StageBuilder {
     val column_meta = df.schema(feature_column).metadata
     val mlAttrData = column_meta.getMetadata("ml_attr")
     val attrsData = mlAttrData.getMetadata("attrs")
-    val featureIndexMapping = attrsData.getMetadataArray("numeric") ++ attrsData.getMetadataArray("binary")
+    val featureIndexMapping = if (attrsData.contains("binary")) {
+      attrsData.getMetadataArray("numeric") ++ attrsData.getMetadataArray("binary")
+    } else {
+      attrsData.getMetadataArray("numeric")
+    }
     featureIndexMapping.sortBy(m => m.getLong("idx"))
   }
 
@@ -87,8 +91,14 @@ object StageBuilder {
       case x: RandomForestClassificationModel => x.featureImportances.toArray
       case x: DecisionTreeRegressionModel => x.featureImportances.toArray
       case x: DecisionTreeClassificationModel => x.featureImportances.toArray
-      case x: XGBoostRegressionModel => x.nativeBooster.getScore(features, "gain").values.toArray
-      case x: XGBoostClassificationModel => x.nativeBooster.getScore(features, "gain").values.toArray
+      case x: XGBoostRegressionModel => {
+        val scores = x.nativeBooster.getScore(features, "gain")
+        features.map(x => scores.getOrElse(x, 0.0))
+      }
+      case x: XGBoostClassificationModel => {
+        val scores = x.nativeBooster.getScore(features, "gain")
+        features.map(x => scores.getOrElse(x, 0.0))
+      }
     }
   }
 }

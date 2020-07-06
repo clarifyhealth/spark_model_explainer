@@ -3,15 +3,22 @@ package com.clarifyhealth.prediction.explainer
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
-import com.clarifyhealth.util.common.StageBuilder.getPipelineStages
+import com.clarifyhealth.util.common.StageBuilder.{getExplainStages, getFeatureImportance, getPipelineStages}
+import ml.dmlc.xgboost4j.scala.spark.XGBoostRegressionModel
 import org.apache.spark.ml.Pipeline
+import java.util.UUID
 
 class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
   test("xgboost4j regression explain") {
     spark.sharedState.cacheManager.clearCache()
 
-    val labelName = "fare_amount"
+    lazy val labelColumn = "fare_amount"
+    lazy val featuresColumn = s"features_${labelColumn}"
+    lazy val features_importance_view = s"features_importance_${labelColumn}_view"
+    lazy val predictions_view = s"prediction_${labelColumn}_view"
+    lazy val contrib_column = s"prediction_${labelColumn}_contrib"
+    lazy val prediction_column = s"prediction_${labelColumn}"
 
     lazy val schema =
       StructType(Array(
@@ -24,7 +31,7 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
         StructField("store_and_fwd", DoubleType),
         StructField("dropoff_longitude", DoubleType),
         StructField("dropoff_latitude", DoubleType),
-        StructField(labelName, DoubleType),
+        StructField(labelColumn, DoubleType),
         StructField("hour", DoubleType),
         StructField("year", IntegerType),
         StructField("month", IntegerType),
@@ -36,19 +43,35 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
     val trainDf = spark.read
       .schema(schema)
       .csv(getClass.getResource("/basic/taxi_small.csv").getPath)
-    
-    val featureNames = trainDf.schema.filter(_.name != labelName).map(_.name).toArray
 
-    val stages = getPipelineStages(Array(), featureNames, labelName, false)
+    val featureNames = trainDf.schema.filter(_.name != labelColumn).map(_.name).toArray
 
-    val pipeline = new Pipeline()
-    pipeline.setStages(stages)
+    val stages = getPipelineStages(Array(), featureNames, labelColumn, false)
 
-    val model = pipeline.fit(trainDf)
+    val trainPipeline = new Pipeline().setStages(stages)
 
-    val df = model.transform(trainDf)
+    val model = trainPipeline.fit(trainDf)
 
-    df.show()
+    val temp_id = UUID.randomUUID()
+    val xgb_model_path = s"/tmp/${temp_id}"
+
+    val xgb_model = model.stages.last.asInstanceOf[XGBoostRegressionModel]
+    xgb_model.write.save(xgb_model_path)
+
+    val predictionDF = model.transform(trainDf)
+    predictionDF.createOrReplaceTempView(predictions_view)
+
+    val featureImportanceDF = getFeatureImportance(spark, xgb_model, predictionDF, featuresColumn)
+    featureImportanceDF.createOrReplaceTempView(features_importance_view)
+
+    featureImportanceDF.show(truncate = false)
+
+    val explainStages = getExplainStages(predictions_view, features_importance_view, labelColumn, xgb_model_path)
+
+    val explainPipeline = new Pipeline().setStages(explainStages)
+    val explainDF = explainPipeline.fit(predictionDF).transform(predictionDF)
+
+    explainDF.show()
 
   }
 
