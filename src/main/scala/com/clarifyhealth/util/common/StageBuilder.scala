@@ -48,7 +48,7 @@ object StageBuilder {
                        rf_model_path: String, classification: Boolean = false): Array[_ <: Transformer] = {
 
     val stages = Array(
-      new OneHotDecoder().setOheSuffix("_OHE").setIdxSuffix("_IDX").setUnknownSuffix("UUnknownn"),
+      new OneHotDecoder().setOheSuffix("_OHE").setIdxSuffix("_IDX").setUnknownSuffix("Unknown"),
       new SQLTransformer().setStatement(s"CREATE OR REPLACE TEMPORARY VIEW ${predictions_view} AS SELECT * from __THIS__")
       ,
       new EnsembleTreeExplainTransformer().setFeatureImportanceView(features_importance_view)
