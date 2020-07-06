@@ -3,6 +3,8 @@ package com.clarifyhealth.prediction.explainer
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
+import com.clarifyhealth.util.common.StageBuilder.getPipelineStages
+import org.apache.spark.ml.Pipeline
 
 class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
@@ -34,15 +36,19 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
     val trainDf = spark.read
       .schema(schema)
       .csv(getClass.getResource("/basic/taxi_small.csv").getPath)
+    
+    val featureNames = trainDf.schema.filter(_.name != labelName).map(_.name).toArray
 
-    lazy val paramMap = Map(
-      "learning_rate" -> 0.05,
-      "max_depth" -> 8,
-      "subsample" -> 0.8,
-      "gamma" -> 1,
-      "num_round" -> 500
-    )
+    val stages = getPipelineStages(Array(), featureNames, labelName, false)
 
+    val pipeline = new Pipeline()
+    pipeline.setStages(stages)
+
+    val model = pipeline.fit(trainDf)
+
+    val df = model.transform(trainDf)
+
+    df.show()
 
   }
 
