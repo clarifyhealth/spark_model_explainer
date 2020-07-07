@@ -289,15 +289,15 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     val model =
       if (getIsClassification) {
         getEnsembleType.toLowerCase() match {
-          case "dct" => DecisionTreeRegressionModel.load(getModelPath)
-          case "gbt" => GBTRegressionModel.load(getModelPath)
+          case "dct" => DecisionTreeClassificationModel.load(getModelPath)
+          case "gbt" => GBTClassificationModel.load(getModelPath)
           case "rf" => RandomForestClassificationModel.load(getModelPath)
           case "xgboost4j" => XGBoostClassificationModel.load(getModelPath).setAllowZeroForMissingValue(true)
         }
       } else {
         getEnsembleType toLowerCase() match {
-          case "dct" => DecisionTreeClassificationModel.load(getModelPath)
-          case "gbt" => GBTClassificationModel.load(getModelPath)
+          case "dct" => DecisionTreeRegressionModel.load(getModelPath)
+          case "gbt" => GBTRegressionModel.load(getModelPath)
           case "rf" => RandomForestRegressionModel.load(getModelPath)
           case "xgboost4j" => XGBoostRegressionModel.load(getModelPath).setAllowZeroForMissingValue(true)
         }
