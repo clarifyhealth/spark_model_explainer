@@ -6,7 +6,7 @@ import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param.{Param, ParamMap}
 import org.apache.spark.ml.regression.{DecisionTreeRegressionModel, GBTRegressionModel, RandomForestRegressionModel}
-import org.apache.spark.ml.util.{DefaultParamsReadable, DefaultParamsWritable, Identifiable, MLWritable}
+import org.apache.spark.ml.util.{DefaultParamsReadable, DefaultParamsWritable, Identifiable}
 import org.apache.spark.ml.{PredictionModel, Transformer}
 import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.functions.lit
@@ -267,9 +267,8 @@ class EnsembleTreeExplainTransformer(override val uid: String)
       model
     )
     val featureCount = featureIndexImportance.size
-    val contrib_intercept = model.predict(
-      Vectors.sparse(featureCount, Array.range(0, featureCount), Array.fill(featureCount)(0.0))
-    )
+    val contrib_intercept = model.predict(Vectors.dense(Array.fill(featureCount)(0.0)))
+
     val finalDF =
       contributionsDF.withColumn(
         "contrib_intercept",
@@ -365,8 +364,8 @@ class EnsembleTreeExplainTransformer(override val uid: String)
                 // handle feature has no contribution
                 outerFeatureNum -> Row(
                   0L,
-                  Vectors.sparse(featureCount, Array.range(0, featureCount), Array.fill(featureCount)(0.0)),
-                  Vectors.sparse(featureCount, Array.range(0, featureCount), Array.fill(featureCount)(0.0))
+                  Vectors.dense(Array.fill(featureCount)(0.0)),
+                  Vectors.dense(Array.fill(featureCount)(0.0))
                 )
               } else {
                 // handle exclusion
@@ -394,8 +393,8 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
                 outerFeatureNum -> Row(
                   1L,
-                  Vectors.dense(inclusionPath).toSparse,
-                  Vectors.dense(exclusionPath).toSparse
+                  Vectors.dense(inclusionPath),
+                  Vectors.dense(exclusionPath)
                 )
               }
           }
