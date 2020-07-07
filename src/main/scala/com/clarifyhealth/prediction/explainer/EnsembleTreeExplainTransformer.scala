@@ -266,11 +266,10 @@ class EnsembleTreeExplainTransformer(override val uid: String)
       featureIndexImportance,
       model
     )
-
+    val featureCount = featureIndexImportance.size
     val contrib_intercept = model.predict(
-      Vectors.sparse(featureIndexImportance.size, Array(), Array())
+      Vectors.sparse(featureCount, Array.range(0, featureCount), Array.fill(featureCount)(0.0))
     )
-
     val finalDF =
       contributionsDF.withColumn(
         "contrib_intercept",
@@ -294,14 +293,14 @@ class EnsembleTreeExplainTransformer(override val uid: String)
           case "dct" => DecisionTreeRegressionModel.load(getModelPath)
           case "gbt" => GBTRegressionModel.load(getModelPath)
           case "rf" => RandomForestClassificationModel.load(getModelPath)
-          case "xgboost4j" => XGBoostClassificationModel.load(getModelPath)
+          case "xgboost4j" => XGBoostClassificationModel.load(getModelPath).setAllowZeroForMissingValue(true)
         }
       } else {
         getEnsembleType toLowerCase() match {
           case "dct" => DecisionTreeClassificationModel.load(getModelPath)
           case "gbt" => GBTClassificationModel.load(getModelPath)
           case "rf" => RandomForestRegressionModel.load(getModelPath)
-          case "xgboost4j" => XGBoostRegressionModel.load(getModelPath)
+          case "xgboost4j" => XGBoostRegressionModel.load(getModelPath).setAllowZeroForMissingValue(true)
         }
       }
     model
@@ -362,13 +361,12 @@ class EnsembleTreeExplainTransformer(override val uid: String)
                   .toString
                   .toDouble
               if (outerFeatureVal == 0) {
+                val featureCount = featureIndexImportance.size
                 // handle feature has no contribution
                 outerFeatureNum -> Row(
                   0L,
-                  Vectors
-                    .sparse(featureIndexImportance.size, Array(), Array()),
-                  Vectors
-                    .sparse(featureIndexImportance.size, Array(), Array())
+                  Vectors.sparse(featureCount, Array.range(0, featureCount), Array.fill(featureCount)(0.0)),
+                  Vectors.sparse(featureCount, Array.range(0, featureCount), Array.fill(featureCount)(0.0))
                 )
               } else {
                 // handle exclusion
