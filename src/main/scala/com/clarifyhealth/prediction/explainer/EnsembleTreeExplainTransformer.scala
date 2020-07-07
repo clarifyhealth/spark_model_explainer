@@ -267,7 +267,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
       model
     )
     val featureCount = featureIndexImportance.size
-    val contrib_intercept = model.predict(Vectors.dense(Array.fill(featureCount)(0.0)))
+    val contrib_intercept = model.predict(Vectors.zeros(featureCount))
 
     val finalDF =
       contributionsDF.withColumn(
@@ -364,8 +364,8 @@ class EnsembleTreeExplainTransformer(override val uid: String)
                 // handle feature has no contribution
                 outerFeatureNum -> Row(
                   0L,
-                  Vectors.dense(Array.fill(featureCount)(0.0)),
-                  Vectors.dense(Array.fill(featureCount)(0.0))
+                  Vectors.zeros(featureCount),
+                  Vectors.zeros(featureCount)
                 )
               } else {
                 // handle exclusion
@@ -393,8 +393,14 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
                 outerFeatureNum -> Row(
                   1L,
-                  Vectors.dense(inclusionPath),
-                  Vectors.dense(exclusionPath)
+                  if (inclusionPath.sum == 0)
+                    Vectors.zeros(inclusionPath.length)
+                  else
+                    Vectors.dense(inclusionPath).toSparse,
+                  if (exclusionPath.sum == 0)
+                    Vectors.zeros(exclusionPath.length)
+                  else
+                    Vectors.dense(exclusionPath).toSparse
                 )
               }
           }
