@@ -15,10 +15,14 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
     lazy val labelColumn = "fare_amount"
     lazy val featuresColumn = s"features_${labelColumn}"
+    lazy val prediction_column = s"prediction_${labelColumn}"
+
+    lazy val contrib_column = s"prediction_${labelColumn}_contrib"
+    lazy val contrib_column_sum = s"${contrib_column}_sum"
+    lazy val contrib_column_intercept = s"${contrib_column}_intercept"
+
     lazy val features_importance_view = s"features_importance_${labelColumn}_view"
     lazy val predictions_view = s"prediction_${labelColumn}_view"
-    lazy val contrib_column = s"prediction_${labelColumn}_contrib"
-    lazy val prediction_column = s"prediction_${labelColumn}"
 
     lazy val schema =
       StructType(Array(
@@ -71,7 +75,12 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
     val explainPipeline = new Pipeline().setStages(explainStages)
     val explainDF = explainPipeline.fit(predictionDF).transform(predictionDF)
 
-    explainDF.show()
+    val explainDFCache = explainDF.orderBy("vendor_id").limit(100).cache()
+
+    checkAnswer(
+      explainDFCache.selectExpr(s"${contrib_column_sum}+${contrib_column_intercept} as test_val").orderBy("vendor_id"),
+      explainDFCache.selectExpr(s"${prediction_column} as  test_val").orderBy("vendor_id")
+    )
 
   }
 
