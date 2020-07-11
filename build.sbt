@@ -37,3 +37,5 @@ libraryDependencies ++= Seq(
 
 )
 
+excludeDependencies += "com.esotericsoftware.kryo" % "kryo"
+
