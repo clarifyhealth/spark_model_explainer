@@ -364,8 +364,8 @@ class EnsembleTreeExplainTransformer(override val uid: String)
                 // handle feature has no contribution
                 outerFeatureNum -> Row(
                   0L,
-                  Vectors.zeros(featureCount),
-                  Vectors.zeros(featureCount)
+                  Vectors.zeros(featureCount).toSparse,
+                  Vectors.zeros(featureCount).toSparse
                 )
               } else {
                 // handle exclusion
