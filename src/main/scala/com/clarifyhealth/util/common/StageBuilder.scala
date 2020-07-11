@@ -3,19 +3,19 @@ package com.clarifyhealth.util.common
 import com.clarifyhealth.ohe.decoder.OneHotDecoder
 import com.clarifyhealth.prediction.explainer.EnsembleTreeExplainTransformer
 import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostClassifier, XGBoostRegressionModel, XGBoostRegressor}
-import org.apache.spark.ml.classification.{DecisionTreeClassificationModel, GBTClassificationModel, RandomForestClassificationModel}
-import org.apache.spark.ml.{PipelineStage, PredictionModel, Transformer}
+import org.apache.spark.ml.classification._
 import org.apache.spark.ml.feature.{OneHotEncoderEstimator, SQLTransformer, StringIndexer, VectorAssembler}
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.types.Metadata
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.ml.regression.{DecisionTreeRegressionModel, GBTRegressionModel, RandomForestRegressionModel}
+import org.apache.spark.ml.regression._
+import org.apache.spark.ml.{PipelineStage, PredictionModel, Predictor, Transformer}
+import org.apache.spark.sql.types.Metadata
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 
 object StageBuilder {
 
   def getPipelineStages(categorical_columns: Array[String], continuous_columns: Array[String], label_column: String,
-                        classification: Boolean = false): Array[_ <: PipelineStage] = {
+                        ensembleType: String, classification: Boolean = false): Array[_ <: PipelineStage] = {
 
     val indexer = categorical_columns.map(c => new StringIndexer().setInputCol(c).setOutputCol(s"${c}_IDX"))
 
@@ -29,33 +29,31 @@ object StageBuilder {
 
     val feature = categorical_columns.map(c => s"${c}_OHE") ++ continuous_columns
 
+    val assembler = new VectorAssembler().setInputCols(feature).setOutputCol(features_column)
+
     // NOTE: Make it work for xgboost4j : missing value will be set as NaN
-    val assembler = new VectorAssembler().setInputCols(feature).setOutputCol(features_column).setHandleInvalid("keep")
-    val xgbParam = Map("allow_non_zero_for_missing" -> true)
+    if (ensembleType == "xgboost4j")
+      assembler.setHandleInvalid("keep")
 
     val xgb = if (classification) {
-      new XGBoostClassifier(xgbParam)
-        .setLabelCol(label_column)
-        .setFeaturesCol(features_column)
-        .setPredictionCol(prediction_column)
+      getClassifier(ensembleType, label_column, features_column, prediction_column)
     } else {
-      new XGBoostRegressor(xgbParam).setLabelCol(label_column)
-        .setFeaturesCol(features_column)
-        .setPredictionCol(prediction_column)
+      getPredictor(ensembleType, label_column, features_column, prediction_column)
     }
     val stages = indexer ++ Array(ohe_encoder, assembler, xgb)
     stages
   }
 
   def getExplainStages(predictions_view: String, features_importance_view: String, label_column: String,
-                       rf_model_path: String, classification: Boolean = false): Array[_ <: Transformer] = {
+                       rf_model_path: String, ensembleType: String,
+                       classification: Boolean = false): Array[_ <: Transformer] = {
 
     val stages = Array(
       new OneHotDecoder().setOheSuffix("_OHE").setIdxSuffix("_IDX").setUnknownSuffix("Unknown"),
       new SQLTransformer().setStatement(s"CREATE OR REPLACE TEMPORARY VIEW ${predictions_view} AS SELECT * from __THIS__")
       ,
       new EnsembleTreeExplainTransformer().setFeatureImportanceView(features_importance_view)
-        .setPredictionView(predictions_view).setLabel(label_column).setEnsembleType("xgboost4j")
+        .setPredictionView(predictions_view).setLabel(label_column).setEnsembleType(ensembleType)
         .setModelPath(rf_model_path).setDropPathColumn(true).setIsClassification(classification)
     )
     stages
@@ -102,6 +100,52 @@ object StageBuilder {
         val scores = x.nativeBooster.getScore(features, "gain")
         features.map(x => scores.getOrElse(x, 0.0))
       }
+    }
+  }
+
+  def getClassifier(ensembleType: String, label_column: String, features_column: String, prediction_column: String): ProbabilisticClassifier[Vector, _, _] = {
+    val xgbParam = Map("allow_non_zero_for_missing" -> true)
+
+    ensembleType match {
+      case "dct" => new DecisionTreeClassifier()
+        .setLabelCol(label_column)
+        .setFeaturesCol(features_column)
+        .setPredictionCol(prediction_column)
+      case "gbt" => new GBTClassifier()
+        .setLabelCol(label_column)
+        .setFeaturesCol(features_column)
+        .setPredictionCol(prediction_column)
+      case "rf" => new RandomForestClassifier()
+        .setLabelCol(label_column)
+        .setFeaturesCol(features_column)
+        .setPredictionCol(prediction_column)
+      case "xgboost4j" => new XGBoostClassifier(xgbParam)
+        .setLabelCol(label_column)
+        .setFeaturesCol(features_column)
+        .setPredictionCol(prediction_column)
+    }
+  }
+
+  def getPredictor(ensembleType: String, label_column: String, features_column: String, prediction_column: String): Predictor[Vector, _, _] = {
+    val xgbParam = Map("allow_non_zero_for_missing" -> true)
+
+    ensembleType match {
+      case "dct" => new DecisionTreeRegressor()
+        .setLabelCol(label_column)
+        .setFeaturesCol(features_column)
+        .setPredictionCol(prediction_column)
+      case "gbt" => new GBTRegressor()
+        .setLabelCol(label_column)
+        .setFeaturesCol(features_column)
+        .setPredictionCol(prediction_column)
+      case "rf" => new RandomForestRegressor()
+        .setLabelCol(label_column)
+        .setFeaturesCol(features_column)
+        .setPredictionCol(prediction_column)
+      case "xgboost4j" => new XGBoostRegressor(xgbParam)
+        .setLabelCol(label_column)
+        .setFeaturesCol(features_column)
+        .setPredictionCol(prediction_column)
     }
   }
 }

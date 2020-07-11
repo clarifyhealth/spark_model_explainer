@@ -10,6 +10,8 @@ import org.apache.spark.sql.test.SharedSparkSession
 
 class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
+  val ENSEMBLE_TYPE = "xgboost4j"
+
   test("xgboost4j regression explain") {
     spark.sharedState.cacheManager.clearCache()
 
@@ -30,7 +32,7 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
     val featureNames = trainDf.schema.filter(x => !Array(idColumn, labelColumn).contains(x.name)).map(_.name).toArray
 
-    val stages = getPipelineStages(Array(), featureNames, labelColumn, false)
+    val stages = getPipelineStages(Array(), featureNames, labelColumn, ENSEMBLE_TYPE, false)
 
     val trainPipeline = new Pipeline().setStages(stages)
 
@@ -50,7 +52,8 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
     featureImportanceDF.show(truncate = false)
 
-    val explainStages = getExplainStages(predictions_view, features_importance_view, labelColumn, xgb_model_path)
+    val explainStages = getExplainStages(predictions_view, features_importance_view, labelColumn,
+      xgb_model_path, ENSEMBLE_TYPE, false)
 
     val explainPipeline = new Pipeline().setStages(explainStages)
     val explainDF = explainPipeline.fit(predictionDF).transform(predictionDF)
@@ -88,7 +91,7 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
     val featureNames = trainDf.schema.filter(x => !Array(idColumn, labelColumn).contains(x.name)).map(_.name).toArray
 
-    val stages = getPipelineStages(Array(), featureNames, labelColumn, true)
+    val stages = getPipelineStages(Array(), featureNames, labelColumn, ENSEMBLE_TYPE, true)
 
     val trainPipeline = new Pipeline().setStages(stages)
 
@@ -108,7 +111,8 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
     featureImportanceDF.show(truncate = false)
 
-    val explainStages = getExplainStages(predictions_view, features_importance_view, labelColumn, xgb_model_path, true)
+    val explainStages = getExplainStages(predictions_view, features_importance_view, labelColumn,
+      xgb_model_path, ENSEMBLE_TYPE, true)
 
     val explainPipeline = new Pipeline().setStages(explainStages)
     val explainDF = explainPipeline.fit(predictionDF).transform(predictionDF)
