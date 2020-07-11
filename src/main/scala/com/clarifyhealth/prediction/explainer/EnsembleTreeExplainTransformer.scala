@@ -292,14 +292,14 @@ class EnsembleTreeExplainTransformer(override val uid: String)
           case "dct" => DecisionTreeClassificationModel.load(getModelPath)
           case "gbt" => GBTClassificationModel.load(getModelPath)
           case "rf" => RandomForestClassificationModel.load(getModelPath)
-          case "xgboost4j" => XGBoostClassificationModel.load(getModelPath).setAllowZeroForMissingValue(true)
+          case "xgboost4j" => XGBoostClassificationModel.load(getModelPath)
         }
       } else {
         getEnsembleType toLowerCase() match {
           case "dct" => DecisionTreeRegressionModel.load(getModelPath)
           case "gbt" => GBTRegressionModel.load(getModelPath)
           case "rf" => RandomForestRegressionModel.load(getModelPath)
-          case "xgboost4j" => XGBoostRegressionModel.load(getModelPath).setAllowZeroForMissingValue(true)
+          case "xgboost4j" => XGBoostRegressionModel.load(getModelPath)
         }
       }
     model
@@ -393,14 +393,8 @@ class EnsembleTreeExplainTransformer(override val uid: String)
 
                 outerFeatureNum -> Row(
                   1L,
-                  if (inclusionPath.sum == 0)
-                    Vectors.zeros(inclusionPath.length)
-                  else
-                    Vectors.dense(inclusionPath).toSparse,
-                  if (exclusionPath.sum == 0)
-                    Vectors.zeros(exclusionPath.length)
-                  else
-                    Vectors.dense(exclusionPath).toSparse
+                  Vectors.dense(inclusionPath).toSparse,
+                  Vectors.dense(exclusionPath).toSparse
                 )
               }
           }
@@ -441,8 +435,9 @@ class EnsembleTreeExplainTransformer(override val uid: String)
                 exclusionVector: Vector
                 )
                 ) =>
+                  // NOTE: converting back to dense to make it work for xgboost4j : missing vs actual 0 in data
                   val contrib =
-                    model.predict(inclusionVector) - model.predict(exclusionVector)
+                    model.predict(inclusionVector.toDense) - model.predict(exclusionVector.toDense)
                   contrib
               }
           }.toSeq

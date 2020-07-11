@@ -29,14 +29,17 @@ object StageBuilder {
 
     val feature = categorical_columns.map(c => s"${c}_OHE") ++ continuous_columns
 
-    val assembler = new VectorAssembler().setInputCols(feature).setOutputCol(features_column)
+    // NOTE: Make it work for xgboost4j : missing value will be set as NaN
+    val assembler = new VectorAssembler().setInputCols(feature).setOutputCol(features_column).setHandleInvalid("keep")
+    val xgbParam = Map("allow_non_zero_for_missing" -> true)
 
     val xgb = if (classification) {
-      new XGBoostClassifier().setLabelCol(label_column)
+      new XGBoostClassifier(xgbParam)
+        .setLabelCol(label_column)
         .setFeaturesCol(features_column)
         .setPredictionCol(prediction_column)
     } else {
-      new XGBoostRegressor().setLabelCol(label_column)
+      new XGBoostRegressor(xgbParam).setLabelCol(label_column)
         .setFeaturesCol(features_column)
         .setPredictionCol(prediction_column)
     }
