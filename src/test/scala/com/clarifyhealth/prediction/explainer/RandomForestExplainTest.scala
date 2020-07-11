@@ -64,8 +64,8 @@ class RandomForestExplainTest extends QueryTest with SharedSparkSession {
     explainDFCache.show(truncate = false)
 
     checkAnswer(
-      explainDFCache.selectExpr(s"${contrib_column_sum}+${contrib_column_intercept} as contribution").orderBy("id"),
-      explainDFCache.selectExpr(s"${prediction_column}").orderBy("id")
+      explainDFCache.selectExpr(s"bround(${contrib_column_sum}+${contrib_column_intercept},5) as contribution").orderBy("id"),
+      explainDFCache.selectExpr(s"bround(${prediction_column},5) as ${prediction_column}").orderBy("id")
     )
 
   }
@@ -123,8 +123,8 @@ class RandomForestExplainTest extends QueryTest with SharedSparkSession {
     explainDFCache.show(truncate = false)
 
     checkAnswer(
-      explainDFCache.selectExpr(s"${contrib_column_sum}+${contrib_column_intercept} as contribution").orderBy("id"),
-      explainDFCache.selectExpr(s"${prediction_column}").orderBy("id")
+      explainDFCache.selectExpr(s"bround(${contrib_column_sum}+${contrib_column_intercept},5) as contribution").orderBy("id"),
+      explainDFCache.selectExpr(s"bround(${prediction_column},5) as ${prediction_column}").orderBy("id")
     )
 
   }
