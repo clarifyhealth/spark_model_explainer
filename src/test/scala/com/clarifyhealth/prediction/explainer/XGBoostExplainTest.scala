@@ -1,19 +1,20 @@
 package com.clarifyhealth.prediction.explainer
 
-import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.test.SharedSparkSession
-import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
+import java.util.UUID
+
 import com.clarifyhealth.util.common.StageBuilder.{getExplainStages, getFeatureImportance, getPipelineStages}
 import ml.dmlc.xgboost4j.scala.spark.XGBoostRegressionModel
 import org.apache.spark.ml.Pipeline
-import java.util.UUID
+import org.apache.spark.sql.QueryTest
+import org.apache.spark.sql.test.SharedSparkSession
 
 class XGBoostExplainTest extends QueryTest with SharedSparkSession {
 
   test("xgboost4j regression explain") {
     spark.sharedState.cacheManager.clearCache()
 
-    lazy val labelColumn = "fare_amount"
+    lazy val idColumn = "id"
+    lazy val labelColumn = "medv"
     lazy val featuresColumn = s"features_${labelColumn}"
     lazy val prediction_column = s"prediction_${labelColumn}"
 
@@ -24,31 +25,10 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
     lazy val features_importance_view = s"features_importance_${labelColumn}_view"
     lazy val predictions_view = s"prediction_${labelColumn}_view"
 
-    lazy val schema =
-      StructType(Array(
-        StructField("vendor_id", DoubleType),
-        StructField("passenger_count", DoubleType),
-        StructField("trip_distance", DoubleType),
-        StructField("pickup_longitude", DoubleType),
-        StructField("pickup_latitude", DoubleType),
-        StructField("rate_code", DoubleType),
-        StructField("store_and_fwd", DoubleType),
-        StructField("dropoff_longitude", DoubleType),
-        StructField("dropoff_latitude", DoubleType),
-        StructField(labelColumn, DoubleType),
-        StructField("hour", DoubleType),
-        StructField("year", IntegerType),
-        StructField("month", IntegerType),
-        StructField("day", DoubleType),
-        StructField("day_of_week", DoubleType),
-        StructField("is_weekend", DoubleType)
-      ))
+    val trainDf = spark.read.option("header", "true").option("inferSchema", "true")
+      .csv(getClass.getResource("/regression/dataset_boston.csv").getPath)
 
-    val trainDf = spark.read
-      .schema(schema)
-      .csv(getClass.getResource("/basic/taxi_small.csv").getPath)
-
-    val featureNames = trainDf.schema.filter(_.name != labelColumn).map(_.name).toArray
+    val featureNames = trainDf.schema.filter(x => !Array(idColumn, labelColumn).contains(x.name)).map(_.name).toArray
 
     val stages = getPipelineStages(Array(), featureNames, labelColumn, false)
 
@@ -75,11 +55,13 @@ class XGBoostExplainTest extends QueryTest with SharedSparkSession {
     val explainPipeline = new Pipeline().setStages(explainStages)
     val explainDF = explainPipeline.fit(predictionDF).transform(predictionDF)
 
-    val explainDFCache = explainDF.orderBy("vendor_id").limit(100).cache()
+    val explainDFCache = explainDF.orderBy("id").limit(100).cache()
+
+    explainDFCache.show(truncate = false)
 
     checkAnswer(
-      explainDFCache.selectExpr(s"${contrib_column_sum}+${contrib_column_intercept} as test_val").orderBy("vendor_id"),
-      explainDFCache.selectExpr(s"${prediction_column} as  test_val").orderBy("vendor_id")
+      explainDFCache.selectExpr(s"${contrib_column_sum}+${contrib_column_intercept} as contribution").orderBy("id"),
+      explainDFCache.selectExpr(s"${prediction_column}").orderBy("id")
     )
 
   }
