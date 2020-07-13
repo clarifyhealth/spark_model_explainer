@@ -1,12 +1,13 @@
 package com.clarifyhealth.prediction.explainer
 
-import org.apache.spark.ml.classification.RandomForestClassificationModel
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
+import org.apache.spark.ml.classification.{DecisionTreeClassificationModel, GBTClassificationModel, RandomForestClassificationModel}
 import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param.{Param, ParamMap}
-import org.apache.spark.ml.regression.RandomForestRegressionModel
+import org.apache.spark.ml.regression.{DecisionTreeRegressionModel, GBTRegressionModel, RandomForestRegressionModel}
 import org.apache.spark.ml.util.{DefaultParamsReadable, DefaultParamsWritable, Identifiable}
-import org.apache.spark.ml.{Model, Transformer}
+import org.apache.spark.ml.{PredictionModel, Transformer}
 import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types._
@@ -257,20 +258,16 @@ class EnsembleTreeExplainTransformer(override val uid: String)
         predictionsDf,
         featureIndexImportance
       )
-    val model =
-      if (getIsClassification)
-        RandomForestClassificationModel.load(getModelPath)
-      else RandomForestRegressionModel.load(getModelPath)
+
+    val model = loadModel()
 
     val contributionsDF = calculateContributions(
       predictionsWithPathsDf,
       featureIndexImportance,
       model
     )
-
-    val contrib_intercept = model.predict(
-      Vectors.sparse(featureIndexImportance.size, Array(), Array())
-    )
+    val featureCount = featureIndexImportance.size
+    val contrib_intercept = model.predict(Vectors.zeros(featureCount))
 
     val finalDF =
       contributionsDF.withColumn(
@@ -285,6 +282,27 @@ class EnsembleTreeExplainTransformer(override val uid: String)
     finalColRenamedDF.createOrReplaceTempView(getPredictionView)
 
     finalColRenamedDF
+  }
+
+
+  private def loadModel(): PredictionModel[Vector, _] = {
+    val model =
+      if (getIsClassification) {
+        getEnsembleType.toLowerCase() match {
+          case "dct" => DecisionTreeClassificationModel.load(getModelPath)
+          case "gbt" => GBTClassificationModel.load(getModelPath)
+          case "rf" => RandomForestClassificationModel.load(getModelPath)
+          case "xgboost4j" => XGBoostClassificationModel.load(getModelPath)
+        }
+      } else {
+        getEnsembleType toLowerCase() match {
+          case "dct" => DecisionTreeRegressionModel.load(getModelPath)
+          case "gbt" => GBTRegressionModel.load(getModelPath)
+          case "rf" => RandomForestRegressionModel.load(getModelPath)
+          case "xgboost4j" => XGBoostRegressionModel.load(getModelPath)
+        }
+      }
+    model
   }
 
   /**
@@ -342,13 +360,12 @@ class EnsembleTreeExplainTransformer(override val uid: String)
                   .toString
                   .toDouble
               if (outerFeatureVal == 0) {
+                val featureCount = featureIndexImportance.size
                 // handle feature has no contribution
                 outerFeatureNum -> Row(
                   0L,
-                  Vectors
-                    .sparse(featureIndexImportance.size, Array(), Array()),
-                  Vectors
-                    .sparse(featureIndexImportance.size, Array(), Array())
+                  Vectors.zeros(featureCount).toSparse,
+                  Vectors.zeros(featureCount).toSparse
                 )
               } else {
                 // handle exclusion
@@ -387,7 +404,7 @@ class EnsembleTreeExplainTransformer(override val uid: String)
   private def calculateContributions(
                                       df: DataFrame,
                                       featureIndexImportance: SortedMap[Long, (String, Double)],
-                                      model: Model[_]
+                                      model: PredictionModel[Vector, _]
                                     ): DataFrame = {
     val encoder =
       buildContribEncoder(df, "contrib")
@@ -402,16 +419,11 @@ class EnsembleTreeExplainTransformer(override val uid: String)
    */
   private val contributionsRows: StructType => (
     SortedMap[Long, (String, Double)],
-      Model[_]
+      PredictionModel[Vector, _]
     ) => Row => Row =
     (schema) =>
       (featureIndexImportance, model) =>
         (row) => {
-          val innerModel =
-            model match {
-              case model1: RandomForestClassificationModel => model1
-              case model2: RandomForestRegressionModel => model2
-            }
           val path = row.getMap[Long, Row](schema.fieldIndex("paths"))
           val contributions: Seq[Double] = featureIndexImportance.map {
             case (outerFeatureNum, _) =>
@@ -423,10 +435,9 @@ class EnsembleTreeExplainTransformer(override val uid: String)
                 exclusionVector: Vector
                 )
                 ) =>
+                  // NOTE: converting back to dense to make it work for xgboost4j : missing vs actual 0 in data
                   val contrib =
-                    innerModel.predict(inclusionVector) - innerModel.predict(
-                      exclusionVector
-                    )
+                    model.predict(inclusionVector.toDense) - model.predict(exclusionVector.toDense)
                   contrib
               }
           }.toSeq
