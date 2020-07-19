@@ -15,8 +15,9 @@ import org.apache.spark.sql.types.{DataTypes, StructType}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 
 import scala.collection.SortedMap
+
 class GLMExplainTransformer(override val uid: String)
-    extends Transformer
+  extends Transformer
     with DefaultParamsWritable {
 
   def this() = this(Identifiable.randomUID("GLMExplainTransformer"))
@@ -173,8 +174,8 @@ class GLMExplainTransformer(override val uid: String)
   private val logLink: (String, String, Double) => String = {
 
     case ("tweedie", x, 0.0) =>
-      s"""case when exp(${x}) = '-Infinity' then ${Double.MinValue} 
-         |when exp(${x}) = '+Infinity' then ${Double.MaxValue} 
+      s"""case when exp(${x}) = '-Infinity' then ${Double.MinValue}
+         |when exp(${x}) = '+Infinity' then ${Double.MaxValue}
          |else exp(${x}) 
          |end""".stripMargin
 
@@ -190,8 +191,8 @@ class GLMExplainTransformer(override val uid: String)
          |else exp(${x}) end""".stripMargin
 
     case ("tweedie" | "poisson" | "gamma", x, _) =>
-      s"""case when exp(${x}) < ${epsilon} then ${epsilon} 
-         |when exp(${x}) = 'Infinity' then ${Double.MaxValue} 
+      s"""case when exp(${x}) < ${epsilon} then ${epsilon}
+         |when exp(${x}) = 'Infinity' then ${Double.MaxValue}
          |else exp(${x}) end""".stripMargin
 
     case (_, x, _) => s"exp(${x})"
@@ -200,8 +201,8 @@ class GLMExplainTransformer(override val uid: String)
   private val logitLink: (String, String, Double) => String = {
 
     case ("tweedie", x, 0.0) =>
-      s"""case when 1/(1+exp(-(${x}))) = '-Infinity' then ${Double.MinValue} 
-         |when 1/(1+exp(-(${x}))) = '+Infinity' then ${Double.MaxValue} 
+      s"""case when 1/(1+exp(-(${x}))) = '-Infinity' then ${Double.MinValue}
+         |when 1/(1+exp(-(${x}))) = '+Infinity' then ${Double.MaxValue}
          |else 1/(1+exp(-(${x}))) end""".stripMargin
 
     case ("gaussian", x, _) =>
@@ -215,8 +216,8 @@ class GLMExplainTransformer(override val uid: String)
          |else 1/(1+exp(-(${x}))) end""".stripMargin
 
     case ("tweedie" | "poisson" | "gamma", x, _) =>
-      s"""case when 1/(1+exp(-(${x}))) < ${epsilon} then ${epsilon} 
-         |when 1/(1+exp(-(${x}))) = 'Infinity' then ${Double.MaxValue} 
+      s"""case when 1/(1+exp(-(${x}))) < ${epsilon} then ${epsilon}
+         |when 1/(1+exp(-(${x}))) = 'Infinity' then ${Double.MaxValue}
          |else 1/(1+exp(-(${x}))) end""".stripMargin
 
     case (_, x, _) => s"1/(1+exp(-(${x})))"
@@ -225,8 +226,8 @@ class GLMExplainTransformer(override val uid: String)
   private val identityLink: (String, String, Double) => String = {
 
     case ("tweedie", x, 0.0) =>
-      s"""case when cast(${x} as double) = '-Infinity' then ${Double.MinValue} 
-         |when cast(${x} as double) = '+Infinity' then ${Double.MaxValue} 
+      s"""case when cast(${x} as double) = '-Infinity' then ${Double.MinValue}
+         |when cast(${x} as double) = '+Infinity' then ${Double.MaxValue}
          |else cast(${x} as double) end""".stripMargin
 
     case ("gaussian", x, _) =>
@@ -240,8 +241,8 @@ class GLMExplainTransformer(override val uid: String)
          |else cast(${x} as double) end""".stripMargin
 
     case ("tweedie" | "poisson" | "gamma", x, _) =>
-      s"""case when cast(${x} as double) < ${epsilon} then ${epsilon} 
-         |when cast(${x} as double) = 'Infinity' then ${Double.MaxValue} 
+      s"""case when cast(${x} as double) < ${epsilon} then ${epsilon}
+         |when cast(${x} as double) = 'Infinity' then ${Double.MaxValue}
          |else cast(${x} as double) end""".stripMargin
 
     case (_, x, _) => s"cast(${x} as double)"
@@ -250,8 +251,8 @@ class GLMExplainTransformer(override val uid: String)
   private val inverseLink: (String, String, Double) => String = {
 
     case ("tweedie", x, 0.0) =>
-      s"""case when 1/cast(${x} as double) = '-Infinity' then ${Double.MinValue} 
-         |when 1/cast(${x} as double) = '+Infinity' then ${Double.MaxValue} 
+      s"""case when 1/cast(${x} as double) = '-Infinity' then ${Double.MinValue}
+         |when 1/cast(${x} as double) = '+Infinity' then ${Double.MaxValue}
          |else 1/cast(${x} as double) end""".stripMargin
 
     case ("gaussian", x, _) =>
@@ -265,8 +266,8 @@ class GLMExplainTransformer(override val uid: String)
          |else 1/cast(${x} as double) end""".stripMargin
 
     case ("tweedie" | "poisson" | "gamma", x, _) =>
-      s"""case when 1/cast(${x} as double) < ${epsilon} then ${epsilon} 
-         |when 1/cast(${x} as double)  = 'Infinity' then ${Double.MaxValue} 
+      s"""case when 1/cast(${x} as double) < ${epsilon} then ${epsilon}
+         |when 1/cast(${x} as double)  = 'Infinity' then ${Double.MaxValue}
          |else 1/cast(${x} as double) end""".stripMargin
 
     case (_, x, _) => s"1/cast(${x} as double)"
@@ -275,8 +276,8 @@ class GLMExplainTransformer(override val uid: String)
   private val otherPowerLink: (String, String, Double, Double) => String = {
 
     case ("tweedie", x, y, 0.0) =>
-      s"""case when pow(${x},1/${y}) = '-Infinity' then ${Double.MinValue} 
-         |when pow(${x},1/${y}) = '+Infinity' then ${Double.MaxValue} 
+      s"""case when pow(${x},1/${y}) = '-Infinity' then ${Double.MinValue}
+         |when pow(${x},1/${y}) = '+Infinity' then ${Double.MaxValue}
          |else pow(${x},1/${y}) end""".stripMargin
 
     case ("gaussian", x, y, _) =>
@@ -290,8 +291,8 @@ class GLMExplainTransformer(override val uid: String)
          |else pow(${x},1/${y}) end""".stripMargin
 
     case ("tweedie" | "poisson" | "gamma", x, y, _) =>
-      s"""case when pow(${x},1/${y})  < ${epsilon} then ${epsilon} 
-         |when pow(${x},1/${y}) = 'Infinity' then ${Double.MaxValue} 
+      s"""case when pow(${x},1/${y})  < ${epsilon} then ${epsilon}
+         |when pow(${x},1/${y}) = 'Infinity' then ${Double.MaxValue}
          |else pow(${x},1/${y}) end""".stripMargin
 
     case (_, x, y, _) => s"pow(${x},1/${y})"
@@ -299,28 +300,29 @@ class GLMExplainTransformer(override val uid: String)
 
   /**
     * Build link function expression dynamically based linkFunctionType
+    *
     * @param linkFunctionType types of link function to use
     * @return
     */
   def buildLinkFunction(
-      family: String,
-      linkFunctionType: String
-  )(linkPower: Double, variancePower: Double): String => String =
+                         family: String,
+                         linkFunctionType: String
+                       )(linkPower: Double, variancePower: Double): String => String =
     (x: String) => {
       (family, linkFunctionType, linkPower, variancePower) match {
         case ("tweedie", _, 0.0, _) => logLink(family, x, variancePower)
         case ("tweedie", _, 1.0, _) => identityLink(family, x, variancePower)
         case ("tweedie", _, 0.5, _) =>
           otherPowerLink(family, x, 0.5, variancePower)
-        case ("tweedie", _, -1.0, _)     => inverseLink(family, x, variancePower)
-        case ("tweedie", _, y, _)        => otherPowerLink(family, x, y, variancePower)
-        case (_, "logLink", _, _)        => logLink(family, x, -1.0)
-        case (_, "logitLink", _, _)      => logitLink(family, x, -1.0)
-        case (_, "identityLink", _, _)   => identityLink(family, x, -1.0)
-        case (_, "powerHalfLink", _, _)  => otherPowerLink(family, x, 0.5, -1.0)
-        case (_, "inverseLink", _, _)    => inverseLink(family, x, -1.0)
+        case ("tweedie", _, -1.0, _) => inverseLink(family, x, variancePower)
+        case ("tweedie", _, y, _) => otherPowerLink(family, x, y, variancePower)
+        case (_, "logLink", _, _) => logLink(family, x, -1.0)
+        case (_, "logitLink", _, _) => logitLink(family, x, -1.0)
+        case (_, "identityLink", _, _) => identityLink(family, x, -1.0)
+        case (_, "powerHalfLink", _, _) => otherPowerLink(family, x, 0.5, -1.0)
+        case (_, "inverseLink", _, _) => inverseLink(family, x, -1.0)
         case (_, "otherPowerLink", y, _) => otherPowerLink(family, x, y, -1.0)
-        case _                           => identityLink(family, x, -1.0)
+        case _ => identityLink(family, x, -1.0)
       }
     }
 
@@ -376,14 +378,15 @@ class GLMExplainTransformer(override val uid: String)
 
   /**
     * To set flattened featureName with double data type schema
+    *
     * @param df
     * @param columnNames
     * @return
     */
   private def getSchema(
-      df: DataFrame,
-      columnNames: List[String]
-  ): StructType = {
+                         df: DataFrame,
+                         columnNames: List[String]
+                       ): StructType = {
     var schema: StructType = df.schema
     columnNames.foreach {
       case (featureName) =>
@@ -394,6 +397,7 @@ class GLMExplainTransformer(override val uid: String)
 
   /**
     * To set nested array(val) schema
+    *
     * @param df
     * @param columnName
     * @return
@@ -410,20 +414,21 @@ class GLMExplainTransformer(override val uid: String)
 
   /**
     * The encoder applies the schema based on nested vs flattened
+    *
     * @param df
     * @param featureCoefficients Map(featureName->Double Value)
-    * @param prefixOrColumnName act as prefix when flattened mode else column name when nested mode
+    * @param prefixOrColumnName  act as prefix when flattened mode else column name when nested mode
     * @param nested
     * @param addVector
     * @return
     */
   private def buildEncoder(
-      df: DataFrame,
-      featureCoefficients: SortedMap[Long, (String, Double)],
-      prefixOrColumnName: String,
-      nested: Boolean,
-      addVector: Boolean
-  ): ExpressionEncoder[Row] = {
+                            df: DataFrame,
+                            featureCoefficients: SortedMap[Long, (String, Double)],
+                            prefixOrColumnName: String,
+                            nested: Boolean,
+                            addVector: Boolean
+                          ): ExpressionEncoder[Row] = {
     val schema =
       if (nested)
         getSchema(
@@ -581,6 +586,7 @@ class GLMExplainTransformer(override val uid: String)
 
   /**
     * The method to prefix column with label
+    *
     * @param label
     * @param df
     * @return
@@ -596,6 +602,7 @@ class GLMExplainTransformer(override val uid: String)
 
   /**
     * This is the main entry point to calculate linear contribution of each feature
+    *
     * @param df
     * @param featureCoefficients
     * @param prefixOrColumnName
@@ -603,11 +610,11 @@ class GLMExplainTransformer(override val uid: String)
     * @return
     */
   private def calculateLinearContributions(
-      df: DataFrame,
-      featureCoefficients: SortedMap[Long, (String, Double)],
-      prefixOrColumnName: String,
-      nested: Boolean
-  ): DataFrame = {
+                                            df: DataFrame,
+                                            featureCoefficients: SortedMap[Long, (String, Double)],
+                                            prefixOrColumnName: String,
+                                            nested: Boolean
+                                          ): DataFrame = {
     val encoder =
       buildEncoder(df, featureCoefficients, prefixOrColumnName, nested, false)
     val func =
@@ -620,9 +627,9 @@ class GLMExplainTransformer(override val uid: String)
     ----------------------------------------------------------------------
    */
   private val mappingLinearContributionsRows: (
-      StructType,
+    StructType,
       Boolean
-  ) => SortedMap[Long, (String, Double)] => Row => Row =
+    ) => SortedMap[Long, (String, Double)] => Row => Row =
     (schema, nested) =>
       (featureCoefficients) =>
         (row) => {
@@ -642,6 +649,7 @@ class GLMExplainTransformer(override val uid: String)
 
   /**
     * This is the main entry point to calculate sigma, sigma+ve, sigma-ve
+    *
     * @param df
     * @param featureCoefficients
     * @param prefixOrColumnName
@@ -649,11 +657,11 @@ class GLMExplainTransformer(override val uid: String)
     * @return
     */
   private def calculateSigma(
-      df: DataFrame,
-      featureCoefficients: SortedMap[Long, (String, Double)],
-      prefixOrColumnName: String,
-      nested: Boolean
-  ): DataFrame = {
+                              df: DataFrame,
+                              featureCoefficients: SortedMap[Long, (String, Double)],
+                              prefixOrColumnName: String,
+                              nested: Boolean
+                            ): DataFrame = {
     val encoder =
       RowEncoder.apply(
         getSchema(df, List("sigma", "sigma_positive", "sigma_negative"))
@@ -667,14 +675,15 @@ class GLMExplainTransformer(override val uid: String)
       df.mapPartitions(x => x.map(func))(encoder)
     }
   }
+
   /*
     Map over Rows and features to calculate sigma, sigma+ve, sigma-ve in flattened mode
     ----------------------------------------------------------------------
    */
   private val mappingSigmaRows: StructType => (
-      String,
+    String,
       SortedMap[Long, (String, Double)]
-  ) => Row => Row =
+    ) => Row => Row =
     (schema) =>
       (prefixOrColumnName, featureCoefficients) =>
         (row) => {
@@ -736,6 +745,7 @@ class GLMExplainTransformer(override val uid: String)
 
   /**
     * This is the main entry point to calculate final contribution of each feature
+    *
     * @param df
     * @param featureCoefficients
     * @param prefixOrColumnName
@@ -743,11 +753,11 @@ class GLMExplainTransformer(override val uid: String)
     * @return
     */
   private def calculateContributions(
-      df: DataFrame,
-      featureCoefficients: SortedMap[Long, (String, Double)],
-      prefixOrColumnName: String,
-      nested: Boolean
-  ): DataFrame = {
+                                      df: DataFrame,
+                                      featureCoefficients: SortedMap[Long, (String, Double)],
+                                      prefixOrColumnName: String,
+                                      nested: Boolean
+                                    ): DataFrame = {
     val encoder =
       buildEncoder(df, featureCoefficients, "contrib", nested, true)
     if (nested) {
@@ -761,14 +771,15 @@ class GLMExplainTransformer(override val uid: String)
       df.mapPartitions(x => x.map(func))(encoder)
     }
   }
+
   /*
     Map over Rows and features to calculate final contribution of each feature flattened mode
     ----------------------------------------------------------------------
    */
   private val mappingContributionsRows: StructType => (
-      String,
+    String,
       SortedMap[Long, (String, Double)]
-  ) => Row => Row =
+    ) => Row => Row =
     (schema) =>
       (prefixOrColumnName, featureCoefficients) =>
         (row) => {
@@ -795,7 +806,7 @@ class GLMExplainTransformer(override val uid: String)
     ----------------------------------------------------------------------
    */
   private val mappingContributionsNestedRows
-      : StructType => String => Row => Row =
+  : StructType => String => Row => Row =
     (schema) =>
       (prefixOrColumnName) =>
         (row) => {
@@ -819,11 +830,11 @@ class GLMExplainTransformer(override val uid: String)
         }
 
   private val calculateContributionsInternal
-      : (Double, Row, StructType) => Double =
+  : (Double, Row, StructType) => Double =
     (
-        linearContribution: Double,
-        row: Row,
-        schema: StructType
+      linearContribution: Double,
+      row: Row,
+      schema: StructType
     ) => {
       val sigmaPosZeroReplace = sigmaPositive(row, schema, true)
       val sigmaNegZeroReplace = sigmaNegative(row, schema, true)
@@ -836,11 +847,11 @@ class GLMExplainTransformer(override val uid: String)
     }
 
   def calculateTotalContrib(
-      df: DataFrame,
-      featureCoefficients: SortedMap[Long, (String, Double)],
-      prefixOrColumnName: String,
-      nested: Boolean
-  ): DataFrame = {
+                             df: DataFrame,
+                             featureCoefficients: SortedMap[Long, (String, Double)],
+                             prefixOrColumnName: String,
+                             nested: Boolean
+                           ): DataFrame = {
     val encoder =
       RowEncoder.apply(getSchema(df, List("contrib_sum")))
     val func =
@@ -849,9 +860,9 @@ class GLMExplainTransformer(override val uid: String)
   }
 
   private val mappingSumRows: (StructType, Boolean) => (
-      String,
+    String,
       SortedMap[Long, (String, Double)]
-  ) => Row => Row =
+    ) => Row => Row =
     (schema, nested) =>
       (prefixOrColumnName, featureCoefficients) =>
         (row) => {
@@ -866,10 +877,7 @@ class GLMExplainTransformer(override val uid: String)
                       schema.fieldIndex(s"${prefixOrColumnName}_${featureName}")
                     )
               }.sum
-          val total = calculate + row.getDouble(
-            schema.fieldIndex(s"contrib_intercept")
-          )
-          Row.merge(row, Row(total))
+          Row.merge(row, Row(calculate))
         }
 
   /**
@@ -891,16 +899,17 @@ class GLMExplainTransformer(override val uid: String)
     * Requirements:
     *  - The copy must have the same UID.
     *  - The copy must have the same Params, with some possibly overwritten by the `extra`
-    *    argument.
+    * argument.
     *  - This should do a deep copy of any data members which are mutable.  That said,
-    *    Transformers should generally be immutable (except for Params), so the `defaultCopy`
-    *    method often suffices.
-    * @param extra  Param values which will overwrite Params in the copy.
+    * Transformers should generally be immutable (except for Params), so the `defaultCopy`
+    * method often suffices.
+    *
+    * @param extra Param values which will overwrite Params in the copy.
     */
   override def copy(extra: ParamMap): Transformer = defaultCopy(extra)
 }
 
 object GLMExplainTransformer
-    extends DefaultParamsReadable[GLMExplainTransformer] {
+  extends DefaultParamsReadable[GLMExplainTransformer] {
   override def load(path: String): GLMExplainTransformer = super.load(path)
 }
